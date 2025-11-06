@@ -1,0 +1,128 @@
+﻿<Window x:Class="SolanaPumpTracker.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Icon="/Assets/tracker_logo.ico"
+        Title="Solana Pump Tracker" Height="720" Width="1100"
+        xmlns:conv="clr-namespace:SolanaPumpTracker.Converters"
+        Background="#0B1220" Foreground="White">
+        <Window.Resources>
+            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <conv:BoolToBrushConverter x:Key="BoolToBrush"/>
+    </Window.Resources>
+    <DockPanel>
+
+        <!-- Верхняя панель -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8" VerticalAlignment="Center">
+            <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                    Fill="{Binding IsConnected, Converter={StaticResource BoolToBrush}}"/>
+
+            <TextBlock Text="Status:" Foreground="#9AA4B2"/>
+            <TextBlock Text="{Binding Status}" Margin="6,0,12,0"/>
+
+            <TextBlock Text="RX:" Foreground="#9AA4B2"/>
+            <TextBlock Text="{Binding RxCount}" Margin="4,0,12,0"/>
+
+            <TextBlock Text="Parsed:" Foreground="#9AA4B2"/>
+            <TextBlock Text="{Binding ParsedCount}" Margin="4,0,12,0"/>
+
+            <TextBlock Text="Errors:" Foreground="#9AA4B2"/>
+            <TextBlock Text="{Binding ErrorCount}" Margin="4,0,12,0"/>
+
+            <Button Content="Start" Command="{Binding StartCommand}" Margin="8,0,0,0"/>
+            <Button Content="Stop" Command="{Binding StopCommand}" Margin="8,0,0,0"/>
+            <Button Content="Config" Command="{Binding OpenConfigCommand}" Margin="8,0,0,0"/>
+            <Button Content="Clear" Command="{Binding ClearCommand}" Margin="8,0,0,0"/>
+
+            <TextBlock Text=" | Log:" Foreground="#9AA4B2" Margin="12,0,0,0"/>
+            <Button Content="Open AppData" Command="{Binding OpenLogAppDataCommand}" Margin="4,0,0,0"/>
+            <Button Content="Open ExeDir" Command="{Binding OpenLogExeCommand}" Margin="4,0,0,0"/>
+            <TextBlock Text=" | DevLists:" Foreground="#9AA4B2" Margin="12,0,0,0"/>
+            <Button Content="Open whitelist" Command="{Binding OpenWhitelistFileCommand}" Margin="4,0,0,0"/>
+            <Button Content="Open blacklist" Command="{Binding OpenBlacklistFileCommand}" Margin="4,0,0,0"/>
+
+        </StackPanel>
+
+        <!-- Последний JSON превью -->
+        <Border DockPanel.Dock="Bottom" Background="#0F1420" Padding="8">
+            <ScrollViewer VerticalScrollBarVisibility="Hidden" Height="90">
+                <TextBlock Text="{Binding LastJsonPreview}" TextWrapping="Wrap" Foreground="#9AA4B2"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Список токенов -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Tokens}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="8" Padding="8" Background="#121A2A" CornerRadius="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="72"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Width="72" Height="72" CornerRadius="8" Background="#0F1420">
+                                    <Image Source="{Binding ImageUrl}" Stretch="UniformToFill"/>
+                                </Border>
+                                <Border Grid.Column="1"/>
+
+                                <StackPanel Grid.Column="2">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold"/>
+                                        <TextBlock Text="  (" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding Symbol}" Foreground="#9AA4B2"/>
+                                        <TextBlock Text=")" Foreground="#9AA4B2"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+
+                                        <TextBlock Text="Dev%:" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding DevHoldsPct, StringFormat=0.#}" Margin="6,0,12,0"/>
+
+                                        <TextBlock Text="Snipers%:" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding SnipersPct, StringFormat=0.#}" Margin="6,0,12,0"/>
+
+                                        <TextBlock Text="DevMigr%:" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding DevMigrationPct, StringFormat=0.#}" Margin="6,0,12,0"/>
+
+                                        <TextBlock Text="WL:" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding IsWhitelisted}" Margin="6,0,12,0"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                        <TextBlock Text="{Binding AuthorUsername}" Foreground="#9AA4B2"/>
+                                        <TextBlock Text=" (" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding AuthorFollowers}" Foreground="#9AA4B2"/>
+                                        <TextBlock Text=")" Foreground="#9AA4B2" Margin="0,0,12,0"/>
+                                        <TextBlock Text="{Binding TweetCreatedAtDisplay}" Foreground="#9AA4B2"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding TweetText}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,6,0,0"
+                                               Foreground="#C7D2FE"
+                                               Visibility="{Binding DataContext.Settings.ShowTweetText,
+                                                                    RelativeSource={RelativeSource AncestorType=Window},
+                                                                    Converter={StaticResource BoolToVis}}"/>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <TextBlock Text="{Binding PoolAddress}" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="  |  " Foreground="#9AA4B2"/>
+                                        <TextBlock>
+                                            <Hyperlink NavigateUri="{Binding LinkUrl}" RequestNavigate="Hyperlink_RequestNavigate">
+                                                <Run Text="Open in Axiom"/>
+                                            </Hyperlink>
+                                        </TextBlock>
+                                        <TextBlock Text="  |  " Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="#9AA4B2"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

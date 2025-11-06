@@ -1,0 +1,109 @@
+﻿<Window x:Class="SolanaPumpTracker.Views.ConfigWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Настройки" Width="520" SizeToContent="Height"
+        Background="#0B1220" Foreground="White">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="12">
+
+            <!-- Подключение -->
+            <GroupBox Header="Подключение" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="Endpoint:" Width="140" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="EndpointBox" Width="320"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="API Key:" Width="140" VerticalAlignment="Center" Foreground="White"/>
+                        <PasswordBox x:Name="ApiKeyBox" Width="320"/>
+                    </StackPanel>
+                    <CheckBox x:Name="AutoReconnectBox" Content="Автопереподключение" Margin="0,8,0,0" Foreground="White" />
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Поток / UI -->
+            <GroupBox Header="Поток / UI" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <!-- УДАЛЕНО: AcceptBatch / IgnoreInitial -->
+                    <CheckBox x:Name="IgnoreHistoryCheck" Content="Игнорировать историю при старте" Foreground="White" />
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Time skew, сек:" Width="180" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="TimeSkewBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Max items:" Width="180" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MaxItemsBox" Width="100"/>
+                    </StackPanel>
+                    <CheckBox x:Name="AutoOpenInBrowserBox" Content="Авто-открывать в Axiom" Foreground="White" />
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Фильтры — миграции -->
+            <GroupBox Header="Фильтры — миграции" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <TextBlock Text="Мин. % миграций дева:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MinDevMigrationPctBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Мин. количество миграций:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MinMigratedTokensBox" Width="100"/>
+                    </StackPanel>
+                    <CheckBox x:Name="RequireLastDevTokenMigratedBox" Content="Последний токен дева мигрировал" Foreground="White" />
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Фильтры — токен/пул -->
+            <GroupBox Header="Фильтры — токен/пул" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Мин. holders:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MinNumHoldersBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Макс. Top10%:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MaxTop10HoldersPctBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Макс. Dev%:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MaxDevHoldsPctBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Макс. Snipers%:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MaxSnipersHoldPctBox" Width="100"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Фильтры — Twitter -->
+            <GroupBox Header="Фильтры — Twitter" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <CheckBox x:Name="PostOnlyBox" Content="Только пост (tweet)" Foreground="White" />
+                    <CheckBox x:Name="ShowTweetTextBox" Content="Показывать текст твита" Margin="0,4,0,0" Foreground="White" />
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Мин. подписчиков автора:" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MinAuthorFollowersBox" Width="100"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Макс. возраст твита (мин):" Width="220" VerticalAlignment="Center" Foreground="White"/>
+                        <TextBox x:Name="MaxTweetAgeMinutesBox" Width="100"/>
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Списки девов -->
+            <GroupBox Header="Whitelist/Blacklist Dev" Margin="0,0,0,8">
+                <StackPanel Margin="8">
+                    <CheckBox x:Name="UseWhitelistFromFileBox" Content="Использовать whitelist_dev.txt" Foreground="White" />
+                    <CheckBox x:Name="UseBlacklistFromFileBox" Content="Использовать blacklist_dev.txt" Margin="0,4,0,0" Foreground="White" />
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Кнопки -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,4">
+                <Button Content="Сохранить" Width="110" Margin="0,0,8,0" IsDefault="True" Click="OnSaveClick"/>
+                <Button Content="Отмена" Width="100" IsCancel="True"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

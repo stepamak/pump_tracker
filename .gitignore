@@ -1,0 +1,157 @@
+###############################################################################
+# Super-safe .gitignore for C# / .NET (WPF, VS/Rider/VSCode) projects
+# Tailored for SolanaPumpTracker-style apps
+###############################################################################
+
+############################
+# OS junk
+############################
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Linux editors
+*~
+
+############################
+# IDE / Editor
+############################
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.cache
+
+# VS Code
+.vscode/
+
+# JetBrains Rider / ReSharper
+.idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# MonoDevelop / Xamarin
+*.userprefs
+
+############################
+# Build artifacts
+############################
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+logs/
+Logs/
+*.log
+*.trace
+*.etl
+
+# Symbols / debug db
+*.pdb
+*.mdb
+*.ipdb
+*.iobj
+
+# MSBuild / NuGet
+project.lock.json
+project.fragment.lock.json
+artifacts/
+packages/
+*.nupkg
+*.snupkg
+# Generated NuGet imports
+*.nuget.props
+*.nuget.targets
+
+############################
+# Test / Coverage / Benchmarks
+############################
+TestResult*
+TestResults/
+*.coverage
+*.coveragexml
+coverage*/
+[Bb]enchmarkDotNet.Artifacts/
+nunit-*.xml
+
+############################
+# Publish / Distribution
+############################
+# General publish outputs
+[Pp]ublish/
+**/bin/**/publish/
+
+# Visual Studio Publish Profiles (can contain secrets/paths)
+**/Properties/PublishProfiles/
+**/*.pubxml
+**/*.pubxml.user
+
+# Self-contained/single-file runtime outputs (kept via publish ignore above)
+*.exe.config
+
+############################
+# Secrets / Local config
+############################
+# Common secrets/conventions
+.env
+.env.*
+*.env
+*.Secrets.json
+secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+# If you keep a project-level settings.json, ignore it for safety
+settings.json
+# Allow committed samples
+!appsettings.sample.json
+!settings.sample.json
+
+# Certificates / keys
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+
+############################
+# Tooling / Static analysis
+############################
+StyleCop.Cache
+.sonarqube/
+.sonar/
+*.sarif
+
+############################
+# Project-specific runtime files
+############################
+# Dev allow/deny lists should live next to the exe, not in git
+whitelist_dev.txt
+blacklist_dev.txt
+!whitelist_dev.sample.txt
+!blacklist_dev.sample.txt
+
+# Local logs near exe
+log.txt
+*.log
+
+############################
+# Misc DB/cache (optional)
+############################
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+############################
+# Crash dumps (optional)
+############################
+*.dmp
+*.mdmp
