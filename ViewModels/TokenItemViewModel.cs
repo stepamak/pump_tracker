@@ -27,6 +27,20 @@ namespace SolanaPumpTracker.ViewModels
         public int DevMigratedCount => _m.dev_info?.migrated_tokens ?? 0;
         public int DevTotalCount => _m.dev_info?.total_tokens ?? 0;
         public bool IsWhitelisted => _m.dev_info?.is_whitelisted ?? false;
+        private bool _isDevMarked;
+        public bool IsDevMarked
+        {
+            get => _isDevMarked;
+            set
+            {
+                if (_isDevMarked == value) return;
+                _isDevMarked = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ShowListButtons));
+            }
+        }
+
+        public bool ShowListButtons => !_isDevMarked;
 
         // Token/Pair
         public double InitialLiqSol => _m.pair_info?.initialLiquiditySol ?? 0.0;

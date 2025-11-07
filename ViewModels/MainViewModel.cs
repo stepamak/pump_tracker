@@ -78,8 +78,8 @@ namespace SolanaPumpTracker.ViewModels
             OpenLogExeCommand = new RelayCommand(_ => SimpleLog.OpenExeFolder());
             WriteTestLogCommand = new RelayCommand(_ => SimpleLog.Info("TEST LOG ENTRY"));
             AddTestTokenCommand = new RelayCommand(_ => AddTestToken());
-            AddDevToWhitelistCommand = new RelayCommand(p => AddDevToList(p as string, true));
-            AddDevToBlacklistCommand = new RelayCommand(p => AddDevToList(p as string, false));
+            AddDevToWhitelistCommand = new RelayCommand(p => AddDevToList(p as TokenItemViewModel, true));
+            AddDevToBlacklistCommand = new RelayCommand(p => AddDevToList(p as TokenItemViewModel, false));
 
             _ws.MessageReceived += OnMessage;
             _ws.ConnectionChanged += (ok, reason) =>
@@ -106,6 +106,43 @@ namespace SolanaPumpTracker.ViewModels
                     });
                 }
             };
+        }
+        private void AddDevToList(TokenItemViewModel? vm, bool toWhitelist)
+        {
+            try
+            {
+                if (vm == null)
+                {
+                    SimpleLog.Info("AddDevToList: null vm");
+                    return;
+                }
+
+                var dev = vm.DevAddress?.Trim();
+                if (string.IsNullOrWhiteSpace(dev))
+                {
+                    SimpleLog.Info("AddDevToList: empty dev");
+                    return;
+                }
+
+                var (tried, used) = toWhitelist
+                    ? DevListService.AddToWhitelist(dev)
+                    : DevListService.AddToBlacklist(dev);
+
+                if (toWhitelist) _devWhitelist.Add(dev);
+                else _devBlacklist.Add(dev);
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    foreach (var t in Tokens.Where(t => string.Equals(t.DevAddress, dev, StringComparison.Ordinal)))
+                        t.IsDevMarked = true;
+                });
+
+                SimpleLog.Info($"AddDevToList: {(toWhitelist ? "whitelist" : "blacklist")} +{dev} (used: {used})");
+            }
+            catch (Exception ex)
+            {
+                SimpleLog.Error($"AddDevToList error: {ex}");
+            }
         }
 
         private void AddDevToList(string? dev, bool toWhitelist)

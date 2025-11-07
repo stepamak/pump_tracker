@@ -43,12 +43,13 @@
 
         </StackPanel>
 
-        <!-- Последний JSON превью -->
+        <!-- Последний JSON превью --><!--
+        
         <Border DockPanel.Dock="Bottom" Background="#0F1420" Padding="8">
             <ScrollViewer VerticalScrollBarVisibility="Hidden" Height="90">
                 <TextBlock Text="{Binding LastJsonPreview}" TextWrapping="Wrap" Foreground="#9AA4B2"/>
             </ScrollViewer>
-        </Border>
+        </Border>-->
 
         <!-- Список токенов -->
         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -118,18 +119,17 @@
                                         <TextBlock Text="  |  " Foreground="#9AA4B2"/>
                                         <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="#9AA4B2"/>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0"
+                                                Visibility="{Binding ShowListButtons, Converter={StaticResource BoolToVis}}">
                                         <Button Content="Add dev to whitelist"
-                                                Command="{Binding DataContext.AddDevToWhitelistCommand, ElementName=RootWindow}"
-                                                CommandParameter="{Binding DevAddress}"
-                                                Margin="0,0,8,0"/>                
+                                                  Command="{Binding DataContext.AddDevToWhitelistCommand, ElementName=RootWindow}"
+                                                  CommandParameter="{Binding}"   
+                                                        Margin="0,0,8,0"/>
 
                                         <Button Content="Add dev to blacklist"
-                                                Command="{Binding DataContext.AddDevToBlacklistCommand, ElementName=RootWindow}"
-                                                CommandParameter="{Binding DevAddress}"/>
+                                                  Command="{Binding DataContext.AddDevToBlacklistCommand, ElementName=RootWindow}"
+                                                  CommandParameter="{Binding}"/>
                                     </StackPanel>
-
-
                                 </StackPanel>
                             </Grid>
                         </Border>
