@@ -38,6 +38,8 @@ namespace SolanaPumpTracker.ViewModels
 
         private string _status = "Disconnected";
         public string Status { get => _status; private set { _status = value; OnPropertyChanged(); } }
+        public ICommand AddDevToWhitelistCommand { get; }
+        public ICommand AddDevToBlacklistCommand { get; }
 
         // Диагностика
         private long _rxCount;
@@ -76,6 +78,8 @@ namespace SolanaPumpTracker.ViewModels
             OpenLogExeCommand = new RelayCommand(_ => SimpleLog.OpenExeFolder());
             WriteTestLogCommand = new RelayCommand(_ => SimpleLog.Info("TEST LOG ENTRY"));
             AddTestTokenCommand = new RelayCommand(_ => AddTestToken());
+            AddDevToWhitelistCommand = new RelayCommand(p => AddDevToList(p as string, true));
+            AddDevToBlacklistCommand = new RelayCommand(p => AddDevToList(p as string, false));
 
             _ws.MessageReceived += OnMessage;
             _ws.ConnectionChanged += (ok, reason) =>
@@ -102,6 +106,31 @@ namespace SolanaPumpTracker.ViewModels
                     });
                 }
             };
+        }
+
+        private void AddDevToList(string? dev, bool toWhitelist)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dev))
+                {
+                    SimpleLog.Info("AddDevToList: empty dev");
+                    return;
+                }
+
+                var (pathTried, pathUsed) = toWhitelist
+                    ? DevListService.AddToWhitelist(dev.Trim())
+                    : DevListService.AddToBlacklist(dev.Trim());
+
+                if (toWhitelist) _devWhitelist.Add(dev.Trim());
+                else _devBlacklist.Add(dev.Trim());
+
+                SimpleLog.Info($"AddDevToList: {(toWhitelist ? "whitelist" : "blacklist")} +{dev} (tried: {pathTried}, used: {pathUsed})");
+            }
+            catch (Exception ex)
+            {
+                SimpleLog.Error($"AddDevToList error: {ex}");
+            }
         }
 
         private void OpenDevFile(string fileName)

@@ -1,6 +1,9 @@
-﻿using System;
+﻿using SolanaPumpTracker.Utils;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace SolanaPumpTracker.Services
 {
@@ -9,33 +12,112 @@ namespace SolanaPumpTracker.Services
         public const string WhitelistFileName = "whitelist_dev.txt";
         public const string BlacklistFileName = "blacklist_dev.txt";
 
-        public static string ExeDir => AppContext.BaseDirectory;
+        public static readonly string ExeDir =
+            AppDomain.CurrentDomain.BaseDirectory;
+
+        public static readonly string AppDataDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SolanaPumpTracker");
+
 
         public static (HashSet<string> whitelist, HashSet<string> blacklist) Load(bool useWhitelist, bool useBlacklist)
         {
-            var wl = useWhitelist ? ReadSet(Path.Combine(ExeDir, WhitelistFileName)) : new HashSet<string>();
-            var bl = useBlacklist ? ReadSet(Path.Combine(ExeDir, BlacklistFileName)) : new HashSet<string>();
+            var wl = new HashSet<string>(StringComparer.Ordinal);
+            var bl = new HashSet<string>(StringComparer.Ordinal);
+
+            if (useWhitelist)
+            {
+                foreach (var p in CandidatePaths(WhitelistFileName))
+                    ReadIntoSet(p, wl);
+            }
+            if (useBlacklist)
+            {
+                foreach (var p in CandidatePaths(BlacklistFileName))
+                    ReadIntoSet(p, bl);
+            }
             return (wl, bl);
         }
 
-        private static HashSet<string> ReadSet(string path)
+        public static (string triedPath, string usedPath) AddToWhitelist(string dev) =>
+            AddToFile(WhitelistFileName, dev);
+
+        public static (string triedPath, string usedPath) AddToBlacklist(string dev) =>
+            AddToFile(BlacklistFileName, dev);
+        private static (string triedPath, string usedPath) AddToFile(string fileName, string dev)
         {
-            var set = new HashSet<string>(StringComparer.Ordinal); // base58 чувствителен к регистру
-            if (!File.Exists(path)) return set;
+            var exePath = Path.Combine(ExeDir, fileName);
+            var ok = TryAppendUniqueLine(exePath, dev, out var used);
+            if (ok) return (exePath, used!);
 
-            foreach (var raw in File.ReadAllLines(path))
+            var appDataPath = Path.Combine(AppDataDir, fileName);
+            Directory.CreateDirectory(AppDataDir);
+            TryAppendUniqueLine(appDataPath, dev, out used);
+            return (exePath, used!);
+        }
+
+        private static bool TryAppendUniqueLine(string path, string dev, out string? usedPath)
+        {
+            usedPath = null;
+            try
             {
-                var line = raw.Trim();
-                if (line.Length == 0) continue;
-                if (line.StartsWith("#") || line.StartsWith(";")) continue;
-                // поддержка инлайн-комментария: адрес # comment
-                var idx = line.IndexOf('#');
-                if (idx >= 0) line = line.Substring(0, idx).Trim();
-                if (line.Length == 0) continue;
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-                set.Add(line);
+                var existing = new HashSet<string>(StringComparer.Ordinal);
+                if (File.Exists(path))
+                {
+                    foreach (var l in File.ReadLines(path, Encoding.UTF8))
+                    {
+                        var t = l.Trim();
+                        if (t.Length == 0 || t.StartsWith("#")) continue;
+                        existing.Add(t);
+                    }
+                }
+
+                if (!existing.Contains(dev))
+                {
+                    using var sw = new StreamWriter(path, append: true, new UTF8Encoding(false));
+                    if (!File.Exists(path) || new FileInfo(path).Length == 0)
+                        sw.WriteLine("# one dev address per line");
+                    sw.WriteLine(dev);
+                }
+
+                usedPath = path;
+                return true;
             }
-            return set;
+            catch (UnauthorizedAccessException)
+            {
+                // нет прав на запись в exe-dir
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // другие ошибки логируем и считаем неуспехом
+                SimpleLog.Error($"DevListService: write failed {path}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static void ReadIntoSet(string path, HashSet<string> set)
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                foreach (var l in File.ReadLines(path, Encoding.UTF8))
+                {
+                    var t = l.Trim();
+                    if (t.Length == 0 || t.StartsWith("#")) continue;
+                    set.Add(t);
+                }
+            }
+            catch (Exception ex)
+            {
+                SimpleLog.Error($"DevListService: read failed {path}: {ex.Message}");
+            }
+        }
+
+        private static IEnumerable<string> CandidatePaths(string fileName)
+        {
+            yield return Path.Combine(ExeDir, fileName);
+            yield return Path.Combine(AppDataDir, fileName);
         }
     }
 }

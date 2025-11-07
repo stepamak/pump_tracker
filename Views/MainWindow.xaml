@@ -1,4 +1,5 @@
 ﻿<Window x:Class="SolanaPumpTracker.Views.MainWindow"
+        x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Icon="/Assets/tracker_logo.ico"
@@ -93,7 +94,7 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                         <TextBlock Text="{Binding AuthorUsername}" Foreground="#9AA4B2"/>
                                         <TextBlock Text=" (" Foreground="#9AA4B2"/>
-                                        <TextBlock Text="{Binding AuthorFollowers}" Foreground="#9AA4B2"/>
+                                        <TextBlock Text="{Binding AuthorFollowersShort}" Foreground="White"/>
                                         <TextBlock Text=")" Foreground="#9AA4B2" Margin="0,0,12,0"/>
                                         <TextBlock Text="{Binding TweetCreatedAtDisplay}" Foreground="#9AA4B2"/>
                                     </StackPanel>
@@ -117,6 +118,18 @@
                                         <TextBlock Text="  |  " Foreground="#9AA4B2"/>
                                         <TextBlock Text="{Binding CreatedAtDisplay}" Foreground="#9AA4B2"/>
                                     </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button Content="Add dev to whitelist"
+                                                Command="{Binding DataContext.AddDevToWhitelistCommand, ElementName=RootWindow}"
+                                                CommandParameter="{Binding DevAddress}"
+                                                Margin="0,0,8,0"/>                
+
+                                        <Button Content="Add dev to blacklist"
+                                                Command="{Binding DataContext.AddDevToBlacklistCommand, ElementName=RootWindow}"
+                                                CommandParameter="{Binding DevAddress}"/>
+                                    </StackPanel>
+
+
                                 </StackPanel>
                             </Grid>
                         </Border>

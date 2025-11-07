@@ -34,10 +34,13 @@ namespace SolanaPumpTracker.ViewModels
         public double Top10Pct => _m.token_info?.top10HoldersPercent ?? 0.0;
         public double DevHoldsPct => _m.token_info?.devHoldsPercent ?? 0.0;
         public double SnipersPct => _m.token_info?.snipersHoldPercent ?? 0.0;
+        public string DevAddress => !string.IsNullOrWhiteSpace(_m.dev_info?.dev_address) ? _m.dev_info!.dev_address : _m.creator;
+
+        public string AuthorFollowersShort => FormatFollowers(AuthorFollowers);
 
         // Twitter
         public string AuthorUsername => _m.twitter_info?.author_username ?? "";
-        public long AuthorFollowers => _m.twitter_info?.author_followers ?? 0;
+        public long AuthorFollowers => (long)(_m.twitter_info?.author_followers ?? 0);
         public string TweetCreatedAtDisplay => _m.twitter_info?.tweet_created_at?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") ?? "N/A";
         public string TweetText => _m.twitter_info?.tweet_text ?? "";
 
@@ -53,5 +56,12 @@ namespace SolanaPumpTracker.ViewModels
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        private static string FormatFollowers(long n)
+        {
+            if (n >= 1_000_000) return $"{n / 1_000_000.0:0.#}M";
+            if (n >= 1_000) return $"{n / 1_000.0:0.#}k";
+            return n.ToString();
+        }
+
     }
 }
