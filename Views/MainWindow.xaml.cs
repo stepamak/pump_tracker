@@ -2,6 +2,9 @@
 using System.Windows;
 using System.Windows.Navigation;
 using SolanaPumpTracker.ViewModels;
+using System.Net.Http;
+using System.Diagnostics;
+
 
 namespace SolanaPumpTracker.Views
 {

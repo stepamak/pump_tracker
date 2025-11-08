@@ -20,8 +20,8 @@
             <TextBlock Text="Status:" Foreground="#9AA4B2"/>
             <TextBlock Text="{Binding Status}" Margin="6,0,12,0"/>
 
-            <TextBlock Text="RX:" Foreground="#9AA4B2"/>
-            <TextBlock Text="{Binding RxCount}" Margin="4,0,12,0"/>
+            <TextBlock Text="Ping:" Foreground="#9AA4B2"/>
+            <TextBlock Text="{Binding PingDisplay}" Margin="4,0,12,0"/>
 
             <TextBlock Text="Parsed:" Foreground="#9AA4B2"/>
             <TextBlock Text="{Binding ParsedCount}" Margin="4,0,12,0"/>
@@ -82,14 +82,9 @@
                                         <TextBlock Text="Dev%:" Foreground="#9AA4B2"/>
                                         <TextBlock Text="{Binding DevHoldsPct, StringFormat=0.#}" Margin="6,0,12,0"/>
 
-                                        <TextBlock Text="Snipers%:" Foreground="#9AA4B2"/>
-                                        <TextBlock Text="{Binding SnipersPct, StringFormat=0.#}" Margin="6,0,12,0"/>
-
                                         <TextBlock Text="DevMigr%:" Foreground="#9AA4B2"/>
                                         <TextBlock Text="{Binding DevMigrationPct, StringFormat=0.#}" Margin="6,0,12,0"/>
 
-                                        <TextBlock Text="WL:" Foreground="#9AA4B2"/>
-                                        <TextBlock Text="{Binding IsWhitelisted}" Margin="6,0,12,0"/>
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
@@ -97,7 +92,6 @@
                                         <TextBlock Text=" (" Foreground="#9AA4B2"/>
                                         <TextBlock Text="{Binding AuthorFollowersShort}" Foreground="White"/>
                                         <TextBlock Text=")" Foreground="#9AA4B2" Margin="0,0,12,0"/>
-                                        <TextBlock Text="{Binding TweetCreatedAtDisplay}" Foreground="#9AA4B2"/>
                                     </StackPanel>
 
                                     <TextBlock Text="{Binding TweetText}"

@@ -1,24 +1,36 @@
-﻿using System;
+﻿using SolanaPumpTracker.Models;
+using SolanaPumpTracker.Services;
+using SolanaPumpTracker.Services;
+using SolanaPumpTracker.Utils;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using SolanaPumpTracker.Models;
-using SolanaPumpTracker.Services;
-using SolanaPumpTracker.Utils;
-using System.Diagnostics;
-using System.IO;
-using SolanaPumpTracker.Services;
+using System.Text.Json;
 
 
 namespace SolanaPumpTracker.ViewModels
 {
     public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
+
+        private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+
+        private string _pingDisplay = "--";
+        public string PingDisplay
+        {
+            get => _pingDisplay;
+            private set { _pingDisplay = value; OnPropertyChanged(); }
+        }
+
         private HashSet<string> _devWhitelist = new(StringComparer.Ordinal);
         private HashSet<string> _devBlacklist = new(StringComparer.Ordinal);
 
@@ -214,12 +226,103 @@ namespace SolanaPumpTracker.ViewModels
                 SimpleLog.Info($"Dev lists: whitelist={_devWhitelist.Count}, blacklist={_devBlacklist.Count}");
 
                 await _ws.ConnectAsync(new Uri(Settings.WebSocketEndpoint), Settings.ApiKey, _cts.Token);
+                _ = Task.Run(() => PingLoopAsync(_cts!.Token));
+
             }
             catch (Exception ex)
             {
                 Status = "Connect error: " + ex.Message;
             }
         }
+        private Uri? BuildPingUri()
+        {
+            try
+            {
+                var ws = new Uri(Settings.WebSocketEndpoint);
+                var scheme = ws.Scheme.Equals("wss", StringComparison.OrdinalIgnoreCase) ? "https" : "http";
+                return new UriBuilder(scheme, ws.Host, ws.Port, "/ping").Uri;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task PingLoopAsync(CancellationToken ct)
+        {
+            var pingUri = BuildPingUri();
+            if (pingUri == null)
+            {
+                Application.Current.Dispatcher.Invoke(() => PingDisplay = "--");
+                return;
+            }
+
+            // первый пинг сразу
+            await DoPingOnceAsync(pingUri, ct);
+
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(ct))
+                {
+                    await DoPingOnceAsync(pingUri, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // нормальное завершение
+            }
+        }
+
+        private async Task DoPingOnceAsync(Uri pingUri, CancellationToken ct)
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, pingUri);
+
+                // Если сервер требует ключ — передадим его:
+                if (!string.IsNullOrWhiteSpace(Settings.ApiKey))
+                    req.Headers.TryAddWithoutValidation("X-API-Key", Settings.ApiKey);
+
+                var sw = Stopwatch.StartNew();
+                using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                var body = await resp.Content.ReadAsStringAsync(ct);
+                sw.Stop();
+
+                bool ok = resp.IsSuccessStatusCode;
+
+                // Дополнительно: если пришёл JSON со status: "ok", считаем пинг успешным,
+                // даже если код не 2xx (на случай 3xx/401 и т.п.)
+                if (!ok)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("status", out var st) &&
+                            st.ValueKind == JsonValueKind.String &&
+                            string.Equals(st.GetString(), "ok", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ok = true;
+                        }
+                    }
+                    catch { /* игнор парс-ошибок */ }
+                }
+
+                var text = ok ? $"{sw.ElapsedMilliseconds} ms" : "fail";
+                Application.Current.Dispatcher.Invoke(() => PingDisplay = text);
+            }
+            catch (TaskCanceledException)
+            {
+                // таймаут/стоп
+                Application.Current.Dispatcher.Invoke(() => PingDisplay = "timeout");
+            }
+            catch (Exception ex)
+            {
+                SimpleLog.Info("Ping error: " + ex.Message);
+                Application.Current.Dispatcher.Invoke(() => PingDisplay = "fail");
+            }
+        }
+
 
         private async Task StopAsync()
         {
@@ -331,11 +434,21 @@ namespace SolanaPumpTracker.ViewModels
 
             if (Settings.RequireLastDevTokenMigrated)
             {
-                var last = m.dev_info?.dev_tokens?
+                IEnumerable<DevToken> list =
+                    m.dev_info?.last_tokens
+                    ?? m.dev_info?.recent_tokens
+                    ?? m.dev_info?.last3_tokens
+                    ?? m.dev_info?.dev_tokens
+                    ?? Enumerable.Empty<DevToken>();
+
+                var last = list
                     .OrderByDescending(dt => dt.created_at ?? DateTime.MinValue)
                     .FirstOrDefault();
+
                 if (last == null || !last.migrated) return false;
             }
+
+
             if (Settings.PostOnly)
             {
                 // считаем, что пост есть, если есть явная ссылка на твит ИЛИ известна дата твита

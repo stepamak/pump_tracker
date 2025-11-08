@@ -1,20 +1,25 @@
-﻿using System;
+﻿using SolanaPumpTracker.Models;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Newtonsoft.Json.Linq;
-using SolanaPumpTracker.Models;
+using System.Text.Json;
 
 namespace SolanaPumpTracker.Utils
 {
     public static class TokenJsonParser
     {
+        // ---- Public API ------------------------------------------------------
+
         public static bool LooksLikeBatch(string json)
         {
             try
             {
-                var root = JToken.Parse(json);
-                return root is JObject o && o["tokens"] is JArray;
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                return root.ValueKind == JsonValueKind.Object
+                       && root.TryGetProperty("tokens", out var arr)
+                       && arr.ValueKind == JsonValueKind.Array;
             }
             catch { return false; }
         }
@@ -23,220 +28,283 @@ namespace SolanaPumpTracker.Utils
         {
             try
             {
-                var o = JObject.Parse(json);
-                var t = (string?)o["type"];
-                return string.Equals(t, "initial", StringComparison.OrdinalIgnoreCase);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Object) return false;
+                if (!root.TryGetProperty("type", out var t) || t.ValueKind != JsonValueKind.String) return false;
+                return string.Equals(t.GetString(), "initial", StringComparison.OrdinalIgnoreCase);
             }
             catch { return false; }
         }
 
         public static List<IncomingTokenMessage> ExtractTokens(string json)
         {
-            var result = new List<IncomingTokenMessage>();
-            JToken root;
-            try { root = JToken.Parse(json); } catch { return result; }
+            var list = new List<IncomingTokenMessage>();
 
-            if (root.Type == JTokenType.Object)
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("tokens", out var arr) &&
+                arr.ValueKind == JsonValueKind.Array)
             {
-                var obj = (JObject)root;
+                foreach (var el in arr.EnumerateArray())
+                    TryAddToken(el, list);
+            }
+            else if (root.ValueKind == JsonValueKind.Object &&
+                     root.TryGetProperty("token", out var one) &&
+                     one.ValueKind == JsonValueKind.Object)
+            {
+                TryAddToken(one, list);
+            }
+            else if (root.ValueKind == JsonValueKind.Object)
+            {
+                // иногда прилетает сразу плоский объект токена
+                TryAddToken(root, list);
+            }
 
-                if (obj.TryGetValue("tokens", out var tokensTok) && tokensTok is JArray tokensArr)
+            return list;
+        }
+
+        // ---- Implementation --------------------------------------------------
+
+        private static void TryAddToken(JsonElement el, List<IncomingTokenMessage> sink)
+        {
+            try
+            {
+                var m = new IncomingTokenMessage
                 {
-                    foreach (var t in tokensArr.OfType<JObject>())
+                    mint = S(el, "mint"),
+                    name = S(el, "name"),
+                    symbol = S(el, "symbol"),
+                    uri = S(el, "uri", "tokenUri"),
+                    bonding_curve = S(el, "bonding_curve", "bondingCurve"),
+                    pair_address = S(el, "pair_address", "pairAddress"),
+                    creator = S(el, "creator", "deployerAddress"),
+                    created_at = D(el, "created_at", "createdAt"),
+                    sol_price = Db(el, "sol_price")
+                };
+
+                // dev_info
+                if (Obj(el, out var dev, "dev_info"))
+                {
+                    var di = new DevInfo
                     {
-                        var msg = BuildIncoming(t);
-                        if (msg != null) result.Add(msg);
-                    }
-                    return result;
+                        dev_address = S(dev.Value, "dev_address", "creator", "deployerAddress"),
+                        is_whitelisted = B(dev.Value, "is_whitelisted", "whitelisted"),
+                        total_tokens = I(dev.Value, "total_tokens", "tokens_count", "tokenCount"),
+                        migrated_tokens = I(dev.Value, "migrated_tokens", "migratedCount"),
+                        migration_percentage = Db(dev.Value, "migration_percentage", "migrationPercent"),
+                        dev_tokens = DevTokens(dev.Value, "dev_tokens"),
+                        last_tokens = DevTokens(dev.Value, "last_tokens"),
+                        recent_tokens = DevTokens(dev.Value, "recent_tokens"),
+                        last3_tokens = DevTokens(dev.Value, "last3_tokens"),
+                    };
+
+                    if (di.migration_percentage <= 0 && di.total_tokens > 0)
+                        di.migration_percentage = 100.0 * di.migrated_tokens / Math.Max(1, di.total_tokens);
+
+                    m.dev_info = di;
                 }
 
-                if (obj.TryGetValue("token", out var tokenTok) && tokenTok is JObject tokenObj)
+                // token_info
+                if (Obj(el, out var ti, "token_info"))
                 {
-                    var msg = BuildIncoming(tokenObj);
-                    if (msg != null) result.Add(msg);
-                    return result;
-                }
-
-                var one = BuildIncoming(obj);
-                if (one != null) result.Add(one);
-                return result;
-            }
-
-            if (root.Type == JTokenType.Array)
-            {
-                foreach (var t in ((JArray)root).OfType<JObject>())
-                {
-                    var msg = BuildIncoming(t);
-                    if (msg != null) result.Add(msg);
-                }
-            }
-            return result;
-        }
-
-        private static IncomingTokenMessage? BuildIncoming(JObject t)
-        {
-            string mint = S(t["mint"])
-                       ?? S(t["token_mint"])
-                       ?? S(t["tokenAddress"])
-                       ?? S(t["token_address"])
-                       ?? S(t["address"])
-                       ?? S(t["pair_address"])
-                       ?? S(t["bonding_curve"])
-                       ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(mint)) return null;
-
-            var metadataObj = t["metadata"] as JObject;
-
-            string name = S(t["name"]) ?? S(metadataObj?["name"]) ?? mint;
-            string symbol = S(t["symbol"]) ?? S(metadataObj?["symbol"]) ?? string.Empty;
-            string image = S(metadataObj?["image"]) ?? S(t["image"]) ?? string.Empty;
-            string twitter = S(metadataObj?["twitter"]) ?? S(t["twitter"]) ?? string.Empty;
-
-            DateTime? createdAt = TryDate(S(t["created_at"]));
-
-            var res = new IncomingTokenMessage
-            {
-                mint = mint,
-                name = name,
-                symbol = symbol,
-                uri = S(t["uri"]) ?? string.Empty,
-                bonding_curve = S(t["bonding_curve"]) ?? string.Empty,
-                pair_address = S(t["pair_address"]) ?? string.Empty,
-                creator = S(t["creator"]) ?? string.Empty,
-                created_at = createdAt,
-                metadata = new Metadata
-                {
-                    name = name,
-                    symbol = symbol,
-                    image = image,
-                    twitter = twitter,
-                    description = S(metadataObj?["description"]) ?? string.Empty,
-                    website = S(metadataObj?["website"]) ?? string.Empty,
-                    show_name = B(metadataObj?["show_name"]),
-                    created_on = S(metadataObj?["created_on"]) ?? string.Empty
-                },
-                dev_info = new DevInfo(),
-                token_info = new TokenInfo(),
-                pair_info = new PairInfo(),
-                twitter_info = new TwitterInfo(),
-                sol_price = D(t["sol_price"])
-            };
-
-            // dev_info
-            if (t["dev_info"] is JObject devObj)
-            {
-                res.dev_info.dev_address = S(devObj["dev_address"]) ?? string.Empty;
-                res.dev_info.total_tokens = (int)D(devObj["total_tokens"]);
-                res.dev_info.migrated_tokens = (int)D(devObj["migrated_tokens"]);
-                res.dev_info.migration_percentage = devObj["migration_percentage"] != null
-                    ? D(devObj["migration_percentage"])
-                    : (res.dev_info.total_tokens > 0 ? (double)res.dev_info.migrated_tokens / res.dev_info.total_tokens * 100.0 : 0.0);
-                res.dev_info.is_whitelisted = B(devObj["is_whitelisted"]);
-
-                if (devObj["dev_tokens"] is JArray dt)
-                {
-                    foreach (var item in dt.OfType<JObject>())
+                    m.token_info = new TokenInfo
                     {
-                        res.dev_info.dev_tokens.Add(new DevToken
-                        {
-                            created_at = TryDate(S(item["created_at"])),
-                            migrated = B(item["migrated"]),
-                            token_address = S(item["token_address"]) ?? string.Empty,
-                            token_name = S(item["token_name"]) ?? string.Empty
-                        });
-                    }
+                        numHolders = I(ti.Value, "numHolders"),
+                        numBotUsers = I(ti.Value, "numBotUsers"),
+                        top10HoldersPercent = Db(ti.Value, "top10HoldersPercent"),
+                        devHoldsPercent = Db(ti.Value, "devHoldsPercent"),
+                        snipersHoldPercent = Db(ti.Value, "snipersHoldPercent"),
+                        insidersHoldPercent = Db(ti.Value, "insidersHoldPercent"),
+                        bundlersHoldPercent = Db(ti.Value, "bundlersHoldPercent"),
+                        totalPairFeesPaid = Db(ti.Value, "totalPairFeesPaid"),
+                        dexPaid = B(ti.Value, "dexPaid"),
+                        dexPaidTime = D(ti.Value, "dexPaidTime")
+                    };
                 }
 
-                if (res.sol_price == 0.0 && devObj["dev_tokens"] is JArray dt2 && dt2.Count > 0)
-                    res.sol_price = D(dt2[0]?["price_sol"]);
-            }
-
-            // pair_info
-            if (t["pair_info"] is JObject p)
-            {
-                res.pair_info.initialLiquiditySol = D(p["initialLiquiditySol"]);
-                res.pair_info.initialLiquidityToken = D(p["initialLiquidityToken"]);
-            }
-
-            // token_info
-            if (t["token_info"] is JObject ti)
-            {
-                res.token_info.numHolders = (int)D(ti["numHolders"]);
-                res.token_info.numBotUsers = (int)D(ti["numBotUsers"]);
-                res.token_info.top10HoldersPercent = D(ti["top10HoldersPercent"]);
-                res.token_info.devHoldsPercent = D(ti["devHoldsPercent"]);
-                res.token_info.snipersHoldPercent = D(ti["snipersHoldPercent"]);
-                res.token_info.insidersHoldPercent = D(ti["insidersHoldPercent"]);
-                res.token_info.bundlersHoldPercent = D(ti["bundlersHoldPercent"]);
-                res.token_info.totalPairFeesPaid = D(ti["totalPairFeesPaid"]);
-                res.token_info.dexPaid = B(ti["dexPaid"]);
-                res.token_info.dexPaidTime = TryDate(S(ti["dexPaidTime"]));
-            }
-
-            // twitter_data
-            if (t["twitter_data"] is JObject tw)
-            {
-                var u = tw["userInfo"] as JObject;
-                res.twitter_info.tweet_created_at = TryDate(S(tw["createdAt"]));
-                res.twitter_info.view_count = (long)D(tw["viewCount"]);
-                res.twitter_info.like_count = (long)D(tw["likeCount"]);
-                res.twitter_info.retweet_count = (long)D(tw["retweetCount"]);
-                res.twitter_info.reply_count = (long)D(tw["replyCount"]);
-                res.twitter_info.tweet_url = S(tw["url"]) ?? S(tw["tweetUrl"]);
-                if (tw["community"] is JObject c)
-                    res.twitter_info.community_url = S(c["url"]);
-
-                res.twitter_info.tweet_text =
-                                                S(tw["text"]) ??
-                                                S(tw["fullText"]) ??
-                                                S(tw["content"]) ??
-                                                S(tw["tweetText"]);
-                var tweetId = S(tw["id"]) ?? S(tw["tweetId"]);
-                if (string.IsNullOrWhiteSpace(res.twitter_info.tweet_url)
-                    && !string.IsNullOrWhiteSpace(tweetId)
-                    && !string.IsNullOrWhiteSpace(res.twitter_info.author_username))
+                // pair_info (нужен хотя бы pairAddress + возможные name/symbol fallback’и)
+                if (Obj(el, out var pi, "pair_info"))
                 {
-                    res.twitter_info.tweet_url = $"https://x.com/{res.twitter_info.author_username}/status/{tweetId}";
+                    // если в корне нет pair_address — вытащим из pair_info.pairAddress
+                    if (string.IsNullOrWhiteSpace(m.pair_address))
+                        m.pair_address = S(pi.Value, "pairAddress", "pair_address");
+
+                    // name/symbol из pair_info, если корневые/metadata пустые
+                    var pName = S(pi.Value, "tokenName");
+                    var pSymbol = S(pi.Value, "tokenTicker");
+
+                    // metadata fallback
+                    if (m.metadata == null) m.metadata = new Metadata();
+                    if (string.IsNullOrWhiteSpace(m.name) && string.IsNullOrWhiteSpace(m.metadata.name) && !string.IsNullOrWhiteSpace(pName))
+                        m.metadata.name = pName;
+                    if (string.IsNullOrWhiteSpace(m.symbol) && string.IsNullOrWhiteSpace(m.metadata.symbol) && !string.IsNullOrWhiteSpace(pSymbol))
+                        m.metadata.symbol = pSymbol;
                 }
 
-                if (u != null)
+                // metadata (если приходит отдельно)
+                if (Obj(el, out var md, "metadata"))
                 {
-                    res.twitter_info.author_followers = (long)D(u["followers"]);
-                    res.twitter_info.is_blue_verified = B(u["isBlueVerified"]);
-                    res.twitter_info.verified_type = S(u["verifiedType"]);
-                    res.twitter_info.author_name = S(u["name"]);
-                    res.twitter_info.author_username = S(u["userName"]);
+                    m.metadata = new Metadata
+                    {
+                        name = S(md.Value, "name") ?? m.metadata?.name ?? string.Empty,
+                        symbol = S(md.Value, "symbol") ?? m.metadata?.symbol ?? string.Empty,
+                        description = S(md.Value, "description") ?? string.Empty,
+                        image = S(md.Value, "image") ?? m.metadata?.image ?? string.Empty,
+                        twitter = S(md.Value, "twitter") ?? string.Empty,
+                        website = S(md.Value, "website") ?? string.Empty,
+                        show_name = B(md.Value, "show_name"),
+                        created_on = S(md.Value, "created_on") ?? string.Empty
+                    };
+                }
+
+                // twitter: сервер может слать twitter_info ИЛИ twitter_data
+                if (Obj(el, out var tw, "twitter_info", "twitter_data"))
+                {
+                    m.twitter_info = new TwitterInfo
+                    {
+                        tweet_url = S(tw.Value, "tweet_url"),
+                        community_url = S(tw.Value, "community_url"),
+                        tweet_created_at = D(tw.Value, "tweet_created_at", "created_at"),
+                        author_username = S(tw.Value, "author_username", "username"),
+                        author_name = S(tw.Value, "author_name", "name"),
+                        author_followers = L(tw.Value, "author_followers", "followers"),
+                        is_blue_verified = B(tw.Value, "is_blue_verified", "blue_verified"),
+                        verified_type = S(tw.Value, "verified_type"),
+                        view_count = L(tw.Value, "view_count", "views"),
+                        like_count = L(tw.Value, "like_count", "likes"),
+                        retweet_count = L(tw.Value, "retweet_count", "retweets"),
+                        reply_count = L(tw.Value, "reply_count", "replies"),
+                        tweet_text = S(tw.Value, "tweet_text", "text")
+                    };
+                }
+
+                // финальные фоллбеки имени/символа
+                if (string.IsNullOrWhiteSpace(m.name))
+                    m.name = m.metadata?.name ?? m.mint;
+                if (string.IsNullOrWhiteSpace(m.symbol))
+                    m.symbol = m.metadata?.symbol ?? "";
+
+                sink.Add(m);
+            }
+            catch
+            {
+                // проглатываем один битый элемент, чтобы не ронять поток
+            }
+        }
+
+        // ---- Helpers: tolerant getters with synonyms -------------------------
+
+        private static bool Obj(JsonElement obj, out JsonElement? found, params string[] names)
+        {
+            found = null;
+            foreach (var n in names)
+            {
+                if (obj.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.Object)
+                {
+                    found = v;
+                    return true;
                 }
             }
-
-            return res;
+            return false;
         }
 
-        private static string? S(JToken? tok)
-            => tok == null || tok.Type == JTokenType.Null ? null :
-               tok.Type == JTokenType.String ? (string)tok : tok.ToString();
-
-        private static double D(JToken? tok)
+        private static string? S(JsonElement obj, params string[] names)
         {
-            if (tok == null || tok.Type == JTokenType.Null) return 0.0;
-            var s = tok.Type == JTokenType.String ? (string)tok : tok.ToString();
-            return double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0.0;
-        }
-
-        private static bool B(JToken? tok)
-        {
-            if (tok == null || tok.Type == JTokenType.Null) return false;
-            if (tok.Type == JTokenType.Boolean) return (bool)tok;
-            var s = tok.ToString().Trim();
-            return string.Equals(s, "true", StringComparison.OrdinalIgnoreCase) || s == "1";
-        }
-
-        private static DateTime? TryDate(string? s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return null;
-            if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var dt)) return dt;
-            if (DateTime.TryParse(s, out dt)) return dt;
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String)
+                    return v.GetString();
             return null;
+        }
+
+        private static int I(JsonElement obj, params string[] names)
+        {
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i)) return i;
+                    if (v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var si)) return si;
+                }
+            return 0;
+        }
+
+        private static long L(JsonElement obj, params string[] names)
+        {
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var i)) return i;
+                    if (v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var si)) return si;
+                }
+            return 0L;
+        }
+
+        private static double Db(JsonElement obj, params string[] names)
+        {
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d)) return d;
+                    if (v.ValueKind == JsonValueKind.String && double.TryParse(v.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var sd)) return sd;
+                }
+            return 0.0;
+        }
+
+        private static bool B(JsonElement obj, params string[] names)
+        {
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v))
+                {
+                    if (v.ValueKind == JsonValueKind.True) return true;
+                    if (v.ValueKind == JsonValueKind.False) return false;
+                    if (v.ValueKind == JsonValueKind.Number)
+                    {
+                        if (v.TryGetInt32(out var i)) return i != 0;
+                        if (v.TryGetDouble(out var d)) return Math.Abs(d) > double.Epsilon;
+                    }
+                    if (v.ValueKind == JsonValueKind.String)
+                    {
+                        var s = v.GetString();
+                        if (bool.TryParse(s, out var b)) return b;
+                        if (int.TryParse(s, out var i2)) return i2 != 0;
+                    }
+                }
+            return false;
+        }
+
+        private static DateTime? D(JsonElement obj, params string[] names)
+        {
+            foreach (var n in names)
+                if (obj.TryGetProperty(n, out var v) && v.ValueKind == JsonValueKind.String)
+                {
+                    var s = v.GetString();
+                    if (!string.IsNullOrWhiteSpace(s) && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt))
+                        return dt;
+                }
+            return null;
+        }
+
+        private static List<DevToken>? DevTokens(JsonElement obj, string prop)
+        {
+            if (!obj.TryGetProperty(prop, out var arr) || arr.ValueKind != JsonValueKind.Array) return null;
+
+            var list = new List<DevToken>();
+            foreach (var it in arr.EnumerateArray())
+            {
+                if (it.ValueKind != JsonValueKind.Object) continue;
+                list.Add(new DevToken
+                {
+                    created_at = D(it, "created_at", "createdAt"),
+                    migrated = B(it, "migrated"),
+                    pair_address = S(it, "pair_address", "pairAddress"),
+                    token_address = S(it, "token_address", "tokenAddress", "mint"),
+                    name = S(it, "name", "token_name"),
+                    symbol = S(it, "symbol", "token_ticker")
+                });
+            }
+            return list;
         }
     }
 }

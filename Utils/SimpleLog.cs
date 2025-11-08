@@ -30,9 +30,9 @@ namespace SolanaPumpTracker.Utils
             try { Process.Start(new ProcessStartInfo(ExeDir) { UseShellExecute = true }); } catch { }
         }
 
-        internal static void Error(string v)
+        public static void Error(string msg)
         {
-            throw new NotImplementedException();
+            Info("ERROR: " + msg);
         }
     }
 }

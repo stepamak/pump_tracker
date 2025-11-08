@@ -24,12 +24,18 @@ namespace SolanaPumpTracker.Models
 
     public sealed class DevInfo
     {
-        public string dev_address { get; set; } = string.Empty;
+        public string? dev_address { get; set; }
+
         public int total_tokens { get; set; }
         public int migrated_tokens { get; set; }
         public double migration_percentage { get; set; }
         public bool is_whitelisted { get; set; }
-        public List<DevToken> dev_tokens { get; set; } = new();
+
+        // ВСЕ одинакового типа:
+        public List<DevToken>? dev_tokens { get; set; }
+        public List<DevToken>? last_tokens { get; set; } 
+        public List<DevToken>? recent_tokens { get; set; }
+        public List<DevToken>? last3_tokens { get; set; }
     }
 
     public sealed class DevToken
@@ -38,6 +44,10 @@ namespace SolanaPumpTracker.Models
         public bool migrated { get; set; }
         public string token_address { get; set; } = string.Empty;
         public string token_name { get; set; } = string.Empty;
+        public string? pair_address { get; set; }
+        public string? name { get; set; }
+        public string? symbol { get; set; }
+
     }
 
     public sealed class TokenAnalysis

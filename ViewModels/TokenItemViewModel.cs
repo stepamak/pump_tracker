@@ -23,9 +23,10 @@ namespace SolanaPumpTracker.ViewModels
         public string CreatedAtDisplay => _m.created_at?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'") ?? "";
 
         // Dev
+        public int DevTotalTokens => _m.dev_info?.total_tokens ?? 0;
+        public int DevMigratedTokens => _m.dev_info?.migrated_tokens ?? 0;
         public double DevMigrationPct => _m.dev_info?.migration_percentage ?? 0.0;
-        public int DevMigratedCount => _m.dev_info?.migrated_tokens ?? 0;
-        public int DevTotalCount => _m.dev_info?.total_tokens ?? 0;
+
         public bool IsWhitelisted => _m.dev_info?.is_whitelisted ?? false;
         private bool _isDevMarked;
         public bool IsDevMarked
